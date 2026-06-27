@@ -9,6 +9,7 @@ class Course(Base):
     title = Column(String, index=True, nullable=False)
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False)
     lessons = relationship("Lesson", back_populates="course", cascade="all, delete-orphan")
     
 class Lesson(Base):
