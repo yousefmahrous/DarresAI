@@ -55,7 +55,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="الإيميل ده متسجل بيه قبل كده!")
 
     hashed_password = pwd_context.hash(user.password)
-    new_user = User(name=user.name, email=user.email, password_hash=hashed_password, role=user.role)
+    new_user = User(name=user.name, email=user.email, password_hash=hashed_password, role=user.role, school_year=user.school_year)
     
     db.add(new_user)
     db.commit()

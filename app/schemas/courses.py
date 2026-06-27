@@ -5,11 +5,13 @@ from datetime import datetime
 class CourseCreate(BaseModel):
     title: str
     description: Optional[str] = None
+    school_year: str
 
 class CourseResponse(BaseModel):
     id: int
     title: str
     description: Optional[str] = None
+    school_year: str
 
     class Config:
         from_attributes = True
