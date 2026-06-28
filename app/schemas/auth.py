@@ -1,10 +1,13 @@
 from pydantic import BaseModel, EmailStr
+from typing import Optional
+
 
 class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
     role: str = "student"
+    school_year: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: int

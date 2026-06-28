@@ -9,6 +9,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     role = Column(String, nullable=False)
+    school_year = Column(String, nullable=True)
     streak_info = relationship("Gamification", uselist=False, back_populates="student")
 
 class StudentParentRelation(Base):
