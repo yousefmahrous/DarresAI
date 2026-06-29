@@ -12,6 +12,10 @@ from app.schemas.courses import (
     LessonResponse, ChatMessageCreate, ChatMessageResponse
 )
 
+from fastapi.responses import StreamingResponse
+from fastapi import BackgroundTasks
+from app.ai.engine import generate_ai_tutor_response
+
 router = APIRouter()
 
 @router.post("/", response_model=CourseResponse, status_code=status.HTTP_201_CREATED)
@@ -148,10 +152,16 @@ def get_lesson_chat_history(lesson_id: int, db: Session = Depends(get_db), curre
     ).order_by(LessonChatMessage.created_at.asc()).all()
     return messages
 
-
-@router.post("/lessons/{lesson_id}/chat", response_model=ChatMessageResponse)
-def send_lesson_chat_message(lesson_id: int, chat_input: ChatMessageCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@router.post("/lessons/{lesson_id}/chat")
+def send_lesson_chat_message(
+    lesson_id: int, 
+    chat_input: ChatMessageCreate, 
+    background_tasks: BackgroundTasks, # عشان نحفظ الرد في الداتا بيز في الخلفية
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
     
+    # 1. حفظ سؤال الطالب في الداتا بيز
     user_msg = LessonChatMessage(
         user_id=current_user.id, 
         lesson_id=lesson_id, 
@@ -162,25 +172,48 @@ def send_lesson_chat_message(lesson_id: int, chat_input: ChatMessageCreate, db: 
     db.add(user_msg)
     db.commit()
 
-    # ========================================================
-    # ⚠️ تنبيه يا عبدالله ليك ولـ مهندس الـ AI: 
-    # حط الدالة (Function) الخاصة بـ الـ AI هنا مستقبلاً.
-    # الفانكشن هتاخد سؤال الطالب (chat_input.content)، وتاريخ الشات القديم من فوق لو محتاجه،
-    # وتعمل بحث في الـ Vector DB، وترجع الرد والنوع ونحطه مكان السطور دي:
-    # ========================================================
-    ai_reply_content = "رد مبدئي: سيب مكانك هنا لمهندس الـ AI يربط الموديل بتاعه ويبحث في الـ Vector DB."
-    ai_reply_type = "text" 
-    # ========================================================
+    # 2. جلب تاريخ المحادثة (عشان الـ AI يفتكر السياق)
+    chat_history = db.query(LessonChatMessage).filter(
+        LessonChatMessage.user_id == current_user.id,
+        LessonChatMessage.lesson_id == lesson_id
+    ).order_by(LessonChatMessage.created_at.asc()).all()
 
+    # 3. دالة لبث الرد وحفظه في الـ DB لما يخلص (Generator Function)
+    def ai_response_generator():
+        # TODO: هنحتاج نجيب الـ subject والـ language من بيانات الـ Course مستقبلاً
+        # حالياً هنفترض إن الكورس فيزياء عربي
+        stream = generate_ai_tutor_response(
+            query=chat_input.content,
+            grade=current_user.school_year,
+            subject="physics", 
+            language="ar",
+            chat_history=chat_history
+        )
+        
+        full_ai_response = ""
+        for chunk in stream:
+            # بث الحروف للـ Frontend
+            yield f"data: {chunk.delta}\n\n"
+            full_ai_response += chunk.delta
+            
+        # بعد ما الـ Stream يخلص، نبعت للـ Frontend إشارة النهاية
+        yield "data: [DONE]\n\n"
+        
+        # تشغيل دالة في الخلفية لحفظ الرد الكامل في الداتا بيز 
+        # عشان الـ Latency ميتأثرش والطالب بيقرأ
+        background_tasks.add_task(save_ai_message_to_db, current_user.id, lesson_id, full_ai_response, db)
+
+    # 4. إرجاع الرد كـ Server-Sent Events (SSE)
+    return StreamingResponse(ai_response_generator(), media_type="text/event-stream")
+
+# دالة مساعدة لحفظ رد الـ AI في الخلفية
+def save_ai_message_to_db(user_id: int, lesson_id: int, content: str, db: Session):
     ai_msg = LessonChatMessage(
-        user_id=current_user.id, 
+        user_id=user_id, 
         lesson_id=lesson_id, 
         sender="ai", 
-        content=ai_reply_content, 
-        message_type=ai_reply_type
+        content=content, 
+        message_type="text"
     )
     db.add(ai_msg)
     db.commit()
-    db.refresh(ai_msg)
-
-    return ai_msg
