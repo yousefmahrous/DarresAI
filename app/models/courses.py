@@ -11,7 +11,6 @@ class Course(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     lessons = relationship("Lesson", back_populates="course", cascade="all, delete-orphan")
     school_year = Column(String, nullable=False)
-    subject = Column(String, index=True) 
     language = Column(String, default="ar")
     
 class Lesson(Base):

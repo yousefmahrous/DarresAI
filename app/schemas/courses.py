@@ -6,12 +6,14 @@ class CourseCreate(BaseModel):
     title: str
     description: Optional[str] = None
     school_year: str
+    language: str
 
 class CourseResponse(BaseModel):
     id: int
     title: str
     description: Optional[str] = None
     school_year: str
+    language: str
 
     class Config:
         from_attributes = True

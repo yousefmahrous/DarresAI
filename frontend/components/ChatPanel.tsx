@@ -1,39 +1,46 @@
-"use client"; // مهمة جداً في Next.js عشان نستخدم State
+"use client";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css"; // ضروري عشان الستايل بتاع المعادلات
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bot, User, Sparkles } from "lucide-react";
-import ChatInput from "./ChatInput"; // تأكد إن مسار الاستدعاء صح
+import ChatInput from "./ChatInput";
+import { BoardState } from "./LessonPanel";
 
-// تعريف شكل الرسالة
 interface Message {
   role: "user" | "ai";
   content: string;
 }
 
-export default function ChatPanel() {
-  // حالة الرسايل (State)
+interface ChatPanelProps {
+  setBoardState: (state: BoardState) => void;
+  widgetMessage?: string | null;
+  setWidgetMessage?: (msg: string | null) => void;
+}
+
+export default function ChatPanel({ setBoardState, widgetMessage, setWidgetMessage }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     { role: "ai", content: "أهلاً بيك! أنا المدرس الذكي بتاعك، تحب تسأل في إيه النهارده؟ 👋" }
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // دالة الإرسال والربط بالباك إند (Streaming)
-  const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
+  const handleSendMessage = async (overrideMessage?: string) => {
+    const userMessage = typeof overrideMessage === 'string' ? overrideMessage : inputValue;
+    
+    if (!userMessage.trim()) return;
 
-    const userMessage = inputValue;
-    setInputValue(""); // تفريغ مربع النص
+    setInputValue("");
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
 
     try {
-      // 1. إضافة مكان فاضي لرسالة الـ AI اللي هتيجي
       setMessages((prev) => [...prev, { role: "ai", content: "" }]);
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const lessonId = 1; // رقم الدرس (هيتغير ديناميكياً بعدين)
-      
+      const lessonId = 1; 
       const token = localStorage.getItem("token");
 
       const response = await fetch(`${apiUrl}/api/courses/lessons/${lessonId}/chat`, {
@@ -45,13 +52,9 @@ export default function ChatPanel() {
         body: JSON.stringify({ content: userMessage }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Server Error: ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`Server Error: ${response.status}`);
       if (!response.body) throw new Error("No response body");
 
-      // 2. قراءة الرد حرف بحرف
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
 
@@ -64,23 +67,33 @@ export default function ChatPanel() {
 
         for (const line of lines) {
           if (line.startsWith("data: ")) {
-            const text = line.replace("data: ", "");
+            const text = line.replace("data: ", "").trim();
 
             if (text === "[DONE]") {
               setIsLoading(false);
-              break;
+              continue;
             }
 
-            // 3. تحديث آخر رسالة (بتاعة الـ AI) بالحرف الجديد
-            setMessages((prev) => {
-              const newMessages = [...prev];
-              const lastIndex = newMessages.length - 1;
-              newMessages[lastIndex] = {
-                ...newMessages[lastIndex],
-                content: newMessages[lastIndex].content + text,
-              };
-              return newMessages;
-            });
+            try {
+              const parsedData = JSON.parse(text);
+
+              if (parsedData.event === "message" && parsedData.data) {
+                setMessages((prev) => {
+                  const newMessages = [...prev];
+                  const lastIndex = newMessages.length - 1;
+                  newMessages[lastIndex] = {
+                    ...newMessages[lastIndex],
+                    content: newMessages[lastIndex].content + parsedData.data,
+                  };
+                  return newMessages;
+                });
+              } 
+              else if (parsedData.event === "board_update" && parsedData.data) {
+                setBoardState(parsedData.data);
+              }
+            } catch (e) {
+              console.error("Error parsing JSON chunk", e, text);
+            }
           }
         }
       }
@@ -92,11 +105,17 @@ export default function ChatPanel() {
     }
   };
 
+  useEffect(() => {
+    if (widgetMessage) {
+      handleSendMessage(widgetMessage);
+      if (setWidgetMessage) setWidgetMessage(null); 
+    }
+  }, [widgetMessage]);
+
   return (
-    <div className="flex flex-1 flex-col rounded-3xl border border-zinc-800 bg-zinc-900 p-8 shadow-lg h-[800px]">
-      
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-6">
+    // التعديل هنا: ضفنا max-h-[800px] و overflow-hidden عشان نقفل حجم الشات
+    <div className="flex flex-1 flex-col rounded-3xl border border-zinc-800 bg-zinc-900 p-8 shadow-lg h-[800px] max-h-[800px] overflow-hidden">
+      <div className="flex items-center justify-between border-b border-zinc-800 pb-6 shrink-0">
         <div className="flex items-center gap-4">
           <div className="rounded-2xl bg-blue-600/15 p-3">
             <Bot className="text-blue-500" size={24} />
@@ -112,20 +131,16 @@ export default function ChatPanel() {
         </div>
       </div>
 
-      {/* Messages Area */}
-      <div className="mt-8 flex-1 space-y-8 overflow-y-auto pr-2">
+      {/* التعديل هنا: ضفنا flex-1 و overflow-y-auto عشان السكرول يشتغل هنا بس */}
+      <div className="mt-8 flex-1 space-y-8 overflow-y-auto pr-2 scroll-smooth">
         {messages.map((msg, index) => (
           <div key={index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`flex max-w-2xl items-${msg.role === "user" ? "end" : "start"} gap-3`}>
-              
-              {/* أيقونة الـ AI */}
               {msg.role === "ai" && (
                 <div className="rounded-full bg-blue-600/15 p-3 shrink-0">
                   <Bot className="text-blue-500" size={20} />
                 </div>
               )}
-
-              {/* فقاعة النص */}
               <div
                 className={
                   msg.role === "user"
@@ -133,11 +148,15 @@ export default function ChatPanel() {
                     : "rounded-2xl border border-zinc-800 bg-zinc-950 p-5 text-zinc-300 leading-8"
                 }
               >
-                {/* استخدام whitespace-pre-wrap عشان يحافظ على المسافات والسطور الجديدة من السيرفر */}
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+                <div className="overflow-x-auto text-sm md:text-base leading-8">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkMath]}
+                    rehypePlugins={[rehypeKatex]}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
               </div>
-
-              {/* أيقونة اليوزر */}
               {msg.role === "user" && (
                 <div className="rounded-full bg-zinc-800 p-3 shrink-0">
                   <User size={18} />
@@ -148,14 +167,9 @@ export default function ChatPanel() {
         ))}
       </div>
 
-      {/* Input Area */}
-      <ChatInput 
-        input={inputValue} 
-        setInput={setInputValue} 
-        onSend={handleSendMessage} 
-        isLoading={isLoading} 
-      />
-
+      <div className="shrink-0 mt-6">
+        <ChatInput input={inputValue} setInput={setInputValue} onSend={() => handleSendMessage()} isLoading={isLoading} />
+      </div>
     </div>
   );
 }

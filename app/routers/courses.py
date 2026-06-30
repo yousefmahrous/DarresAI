@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+import json # ضفنا المكتبة دي عشان نحول الداتا لـ JSON في الـ Stream
 
 from app.database import get_db
 from app.routers.auth import get_current_user
@@ -29,7 +30,8 @@ def create_course(course: CourseCreate, db: Session = Depends(get_db), current_u
     new_course = Course(
         title=course.title, 
         description=course.description,
-        school_year=course.school_year
+        school_year=course.school_year,
+        language=course.language
     )
     db.add(new_course)
     db.commit()
@@ -156,25 +158,25 @@ def get_lesson_chat_history(lesson_id: int, db: Session = Depends(get_db), curre
 def send_lesson_chat_message(
     lesson_id: int, 
     chat_input: ChatMessageCreate, 
-    background_tasks: BackgroundTasks, # عشان نحفظ الرد في الداتا بيز في الخلفية
+    background_tasks: BackgroundTasks, 
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    # lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    # if not lesson:
-    #     raise HTTPException(status_code=404, detail="الدرس غير موجود.")
+    # 1. تفعيل فحص الداتا بيز للدرس والكورس (الصح بقى)
+    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    if not lesson:
+        raise HTTPException(status_code=404, detail="الدرس غير موجود.")
     
-    # course = db.query(Course).filter(Course.id == lesson.course_id).first()
-    # if not course:
-    #     raise HTTPException(status_code=404, detail="الكورس المرتبط بهذا الدرس غير موجود.")
+    course = db.query(Course).filter(Course.id == lesson.course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="الكورس المرتبط بهذا الدرس غير موجود.")
     
-    # course_subject = course.subject
-    # course_language = course.language
+    # ملحوظة: لو الـ Course Model لسه مفيهوش أعمدة subject و language، 
+    # استخدمنا getattr عشان نجيبهم ولو مش موجودين نحط قيم افتراضية عشان الكود ميضربش
+    course_language = getattr(course, "language", "Arabic")
+    course_title = course.title
     
-    course_subject = "Mathematics"
-    course_language = "Arabic"
-    
-    # 1. حفظ سؤال الطالب في الداتا بيز
+    # 2. تفعيل حفظ سؤال الطالب في الداتا بيز
     user_msg = LessonChatMessage(
         user_id=current_user.id, 
         lesson_id=lesson_id, 
@@ -182,42 +184,41 @@ def send_lesson_chat_message(
         content=chat_input.content, 
         message_type="text"
     )
-    # db.add(user_msg)
-    # db.commit()
+    db.add(user_msg)
+    db.commit()
 
-    # 2. جلب تاريخ المحادثة (عشان الـ AI يفتكر السياق)
+    # 3. جلب تاريخ المحادثة الحقيقي من الداتا بيز
     chat_history = db.query(LessonChatMessage).filter(
         LessonChatMessage.user_id == current_user.id,
         LessonChatMessage.lesson_id == lesson_id
     ).order_by(LessonChatMessage.created_at.asc()).all()
 
-    # 3. دالة لبث الرد وحفظه في الـ DB لما يخلص (Generator Function)
+    # 4. دالة الـ Streaming اللي بتبعت JSON للسبورة والشات
     def ai_response_generator():
         stream = generate_ai_tutor_response(
             query=chat_input.content,
             grade=current_user.school_year,
-            subject=course_subject, 
+            subject=course_title, 
             language=course_language,
             chat_history=chat_history
         )
         
         full_ai_response = ""
         for chunk in stream:
-            # بث الحروف للـ Frontend
-            yield f"data: {chunk.delta}\n\n"
-            full_ai_response += chunk.delta
+            # بنجمع النص لو الحدث كان "message" عشان نحفظه في الداتا بيز
+            if chunk.get("event") == "message" and chunk.get("data"):
+                full_ai_response += str(chunk["data"])
+                
+            # تحويل الـ Chunk لـ JSON String وبعته في الـ Stream
+            yield f"data: {json.dumps(chunk)}\n\n"
             
-        # بعد ما الـ Stream يخلص، نبعت للـ Frontend إشارة النهاية
         yield "data: [DONE]\n\n"
         
-        # تشغيل دالة في الخلفية لحفظ الرد الكامل في الداتا بيز 
-        # عشان الـ Latency ميتأثرش والطالب بيقرأ
-        # background_tasks.add_task(save_ai_message_to_db, current_user.id, lesson_id, full_ai_response, db)
+        # 5. تفعيل حفظ رد الـ AI في الخلفية بعد ما الـ Stream يخلص
+        background_tasks.add_task(save_ai_message_to_db, current_user.id, lesson_id, full_ai_response, db)
 
-    # 4. إرجاع الرد كـ Server-Sent Events (SSE)
     return StreamingResponse(ai_response_generator(), media_type="text/event-stream")
 
-# دالة مساعدة لحفظ رد الـ AI في الخلفية
 def save_ai_message_to_db(user_id: int, lesson_id: int, content: str, db: Session):
     ai_msg = LessonChatMessage(
         user_id=user_id, 

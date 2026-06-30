@@ -1,131 +1,111 @@
-import { BookOpen, Target, Clock3, ArrowRight } from "lucide-react";
+"use client";
 
-export default function LessonPanel() {
+import { useState } from "react";
+import { BookOpen, SlidersHorizontal, Send } from "lucide-react";
+import "katex/dist/katex.min.css";
+import { BlockMath } from "react-katex";
+
+export interface BoardState {
+  type: "formula" | "image" | "widget" | null;
+  payload: any;
+}
+
+interface LessonPanelProps {
+  boardState: BoardState | null;
+  // الـ Prop الشرعي لربط السبورة بالشات
+  setWidgetMessage?: (msg: string) => void;
+}
+
+export default function LessonPanel({ boardState, setWidgetMessage }: LessonPanelProps) {
+  const [sliderValue, setSliderValue] = useState<number>(0);
+
+  const handleWidgetLoad = (min: number, max: number) => {
+    if (sliderValue < min || sliderValue > max) {
+      setSliderValue(Math.floor((min + max) / 2));
+    }
+  };
+
   return (
-    <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-8 shadow-lg">
-
-      {/* Header */}
-      <div className="flex items-start justify-between">
-
-        <div>
-
-          <p className="text-sm font-medium text-blue-500">
-            Current Lesson
-          </p>
-
-          <h1 className="mt-2 text-3xl font-bold text-white">
-            Newton's Second Law
-          </h1>
-
-        </div>
-
+    <div className="flex h-[800px] flex-col rounded-3xl border border-zinc-800 bg-zinc-950 p-8 shadow-lg">
+      <div className="flex items-center gap-3 border-b border-zinc-800 pb-6">
         <div className="rounded-xl bg-blue-600/15 p-3">
           <BookOpen className="text-blue-500" size={24} />
         </div>
-
-      </div>
-
-      {/* Lesson Info */}
-
-      <div className="mt-8 flex gap-3">
-
-        <span className="rounded-full bg-blue-600/15 px-3 py-1 text-sm font-medium text-blue-400">
-          Physics
-        </span>
-
-        <span className="rounded-full bg-zinc-800 px-3 py-1 text-sm text-zinc-300">
-          Lesson 8 / 12
-        </span>
-
-        <span className="rounded-full bg-zinc-800 px-3 py-1 text-sm text-zinc-300 flex items-center gap-2">
-          <Clock3 size={14} />
-          12 min
-        </span>
-
-      </div>
-
-      {/* Formula */}
-
-      <div className="mt-8 rounded-2xl border border-blue-500/30 bg-zinc-950 p-8">
-
-        <p className="text-center text-5xl font-bold tracking-wide text-blue-500">
-          F = m × a
-        </p>
-
-        <p className="mt-3 text-center text-sm text-zinc-500">
-          Force = Mass × Acceleration
-        </p>
-
-      </div>
-
-      {/* Objectives */}
-
-      <div className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
-
-        <div className="flex items-center gap-2">
-
-          <Target className="text-blue-500" size={20} />
-
-          <h3 className="text-lg font-semibold">
-            Learning Objectives
-          </h3>
-
+        <div>
+          <h2 className="text-2xl font-bold text-white">Interactive Board</h2>
+          <p className="text-sm text-zinc-400">DARES-AI Workspace</p>
         </div>
-
-        <ul className="mt-5 space-y-3 text-zinc-400">
-
-          <li>• Understand the relationship between force and acceleration.</li>
-
-          <li>• Apply Newton's Second Law to real-world problems.</li>
-
-          <li>• Solve numerical physics exercises.</li>
-
-        </ul>
-
       </div>
 
-      {/* Explanation */}
+      <div className="mt-8 flex flex-1 items-center justify-center rounded-2xl border border-dashed border-zinc-700 bg-zinc-900 p-8 relative overflow-hidden">
+        
+        {!boardState && (
+          <p className="text-center text-zinc-500">
+            اطلب من المدرس الذكي كتابة معادلة أو عرض صورة أو معمل لتظهر هنا...
+          </p>
+        )}
 
-      <div className="mt-8">
+        {boardState?.type === "formula" && (
+          <div className="text-4xl text-blue-400">
+            <BlockMath math={boardState.payload} />
+          </div>
+        )}
 
-        <h3 className="text-xl font-semibold">
-          Explanation
-        </h3>
+        {boardState?.type === "image" && (
+          <img 
+            src={boardState.payload} 
+            alt="Board Content" 
+            className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
+          />
+        )}
 
-        <p className="mt-4 leading-8 text-zinc-400">
-          Newton's Second Law explains that an object's acceleration is directly
-          proportional to the force applied and inversely proportional to its
-          mass. Increasing the applied force increases acceleration, while
-          increasing mass reduces acceleration if the force remains constant.
-        </p>
+        {boardState?.type === "widget" && (
+          <div className="flex w-full max-w-md flex-col items-center justify-center rounded-2xl border border-zinc-700 bg-zinc-800 p-8 shadow-2xl"
+               onLoad={() => handleWidgetLoad(boardState.payload.min || 0, boardState.payload.max || 100)}>
+            
+            <div className="mb-6 flex items-center gap-3">
+              <SlidersHorizontal className="text-blue-500" size={24} />
+              <h3 className="text-xl font-bold text-white">
+                {boardState.payload.label || "Interactive Slider"}
+              </h3>
+            </div>
+
+            <input
+              type="range"
+              min={boardState.payload.min || 0}
+              max={boardState.payload.max || 100}
+              step={boardState.payload.step || 1}
+              value={sliderValue}
+              onChange={(e) => setSliderValue(Number(e.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-zinc-600 accent-blue-500 transition hover:accent-blue-400"
+            />
+            
+            <div className="mt-8 flex items-baseline gap-2">
+              <span className="text-5xl font-black text-blue-400">{sliderValue}</span>
+              <span className="text-lg text-zinc-400">Unit</span>
+            </div>
+
+            {/* زرار الإرسال */}
+            <button
+              onClick={() => {
+                const msg = `أنا ظبطت قيمة المؤشر (${boardState?.payload?.label || 'الكتلة'}) على ${sliderValue}، إيه تأثير ده على النتيجة؟`;
+                if (setWidgetMessage) {
+                  setWidgetMessage(msg);
+                }
+              }}
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600/20 py-3 font-semibold text-blue-400 transition-all duration-300 hover:bg-blue-600 hover:text-white"
+            >
+              <Send size={18} />
+              شارك تجربتك مع المدرس
+            </button>
+
+            <p className="mt-6 text-center text-sm text-zinc-400">
+              حرك المؤشر ولاحظ التغيير، وتناقش مع المدرس في الشات حول النتيجة.
+            </p>
+          </div>
+        )}
 
       </div>
-
-      {/* Button */}
-
-      <button
-        className="
-          mt-8
-          flex
-          w-full
-          items-center
-          justify-center
-          gap-2
-          rounded-2xl
-          bg-blue-600
-          py-4
-          font-semibold
-          transition-all
-          duration-300
-          hover:bg-blue-700
-        "
-      >
-        Start Quiz
-
-        <ArrowRight size={18} />
-
-      </button>
-
     </div>
   );
 }
