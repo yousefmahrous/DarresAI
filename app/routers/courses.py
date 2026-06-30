@@ -160,6 +160,19 @@ def send_lesson_chat_message(
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
+    # lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    # if not lesson:
+    #     raise HTTPException(status_code=404, detail="الدرس غير موجود.")
+    
+    # course = db.query(Course).filter(Course.id == lesson.course_id).first()
+    # if not course:
+    #     raise HTTPException(status_code=404, detail="الكورس المرتبط بهذا الدرس غير موجود.")
+    
+    # course_subject = course.subject
+    # course_language = course.language
+    
+    course_subject = "Mathematics"
+    course_language = "Arabic"
     
     # 1. حفظ سؤال الطالب في الداتا بيز
     user_msg = LessonChatMessage(
@@ -169,8 +182,8 @@ def send_lesson_chat_message(
         content=chat_input.content, 
         message_type="text"
     )
-    db.add(user_msg)
-    db.commit()
+    # db.add(user_msg)
+    # db.commit()
 
     # 2. جلب تاريخ المحادثة (عشان الـ AI يفتكر السياق)
     chat_history = db.query(LessonChatMessage).filter(
@@ -180,13 +193,11 @@ def send_lesson_chat_message(
 
     # 3. دالة لبث الرد وحفظه في الـ DB لما يخلص (Generator Function)
     def ai_response_generator():
-        # TODO: هنحتاج نجيب الـ subject والـ language من بيانات الـ Course مستقبلاً
-        # حالياً هنفترض إن الكورس فيزياء عربي
         stream = generate_ai_tutor_response(
             query=chat_input.content,
             grade=current_user.school_year,
-            subject="physics", 
-            language="ar",
+            subject=course_subject, 
+            language=course_language,
             chat_history=chat_history
         )
         
@@ -201,7 +212,7 @@ def send_lesson_chat_message(
         
         # تشغيل دالة في الخلفية لحفظ الرد الكامل في الداتا بيز 
         # عشان الـ Latency ميتأثرش والطالب بيقرأ
-        background_tasks.add_task(save_ai_message_to_db, current_user.id, lesson_id, full_ai_response, db)
+        # background_tasks.add_task(save_ai_message_to_db, current_user.id, lesson_id, full_ai_response, db)
 
     # 4. إرجاع الرد كـ Server-Sent Events (SSE)
     return StreamingResponse(ai_response_generator(), media_type="text/event-stream")

@@ -1,13 +1,19 @@
 from llama_index.llms.anthropic import Anthropic
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core import Settings
+from llama_index.llms.openai import OpenAI
+from llama_index.core import Settings
 import os
 
 from app.ai.prompts import SOCRATIC_TUTOR_PROMPT
 
 # 1. إعداد الـ LLM (يفضل Claude 3.5 Sonnet عشان عبقري في الـ Socratic Method)
 # تأكد إن الـ API Key موجود في ملف الـ .env
-llm = Anthropic(model="claude-3-5-sonnet-20240620", temperature=0.2)
+# llm = Anthropic(model="claude-3-5-sonnet-20240620", temperature=0.2)
+llm = OpenAI(
+    model="gpt-4o-mini", 
+    api_key=os.environ.get("OPENAI_API_KEY")
+)
 Settings.llm = llm
 
 def generate_socratic_stream(query: str, context_str: str, chat_history: list):
