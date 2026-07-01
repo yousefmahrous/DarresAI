@@ -14,9 +14,6 @@ export default function ChatInput({ input = "", setInput, onSend, isLoading }: C
   return (
     <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
       <div className="flex items-center gap-3">
-        <button className="rounded-xl p-3 text-zinc-400 transition hover:bg-zinc-800 hover:text-white">
-          <Paperclip size={20} />
-        </button>
 
         <input
           type="text"
@@ -29,10 +26,6 @@ export default function ChatInput({ input = "", setInput, onSend, isLoading }: C
           disabled={isLoading}
           className="flex-1 bg-transparent px-2 py-3 text-white outline-none placeholder:text-zinc-500 disabled:opacity-50"
         />
-
-        <button className="rounded-xl p-3 text-zinc-400 transition hover:bg-zinc-800 hover:text-white">
-          <Mic size={20} />
-        </button>
 
         <button
           onClick={onSend}

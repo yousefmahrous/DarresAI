@@ -44,12 +44,12 @@ def generate_socratic_stream(query: str, context_str: str, chat_history: list):
                     "properties": {
                         "type": {
                             "type": "string",
-                            "enum": ["formula", "image", "widget"],
-                            "description": "نوع المحتوى: formula للمعادلة، image للصورة."
+                            "enum": ["formula", "image", "widget", "code"], # ضفنا code هنا
+                            "description": "نوع المحتوى: formula للمعادلة، image للصورة، code للأكواد."
                         },
                         "payload": {
                             "type": "string",
-                            "description": "المحتوى نفسه: كود LaTeX للمعادلة (بدون علامات الدولار)، أو رابط الصورة."
+                            "description": "المحتوى نفسه: كود LaTeX للمعادلة، رابط الصورة، أو الكود البرمجي."
                         }
                     },
                     "required": ["type", "payload"]

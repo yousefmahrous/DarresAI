@@ -42,13 +42,17 @@ def get_student_profile(db: Session = Depends(get_db), current_user: User = Depe
         
     gamification = db.query(Gamification).filter(Gamification.student_id == current_user.id).first()
     
+    # التعديل هنا: الستريك بيبدأ من 1 للطالب الجديد
+    streak_val = gamification.streak if gamification and gamification.streak > 0 else 1
+    points_val = gamification.points if gamification else 0
+    
     return {
         "id": current_user.id,
         "name": current_user.name,
         "email": current_user.email,
         "role": current_user.role,
-        "streak": gamification.streak if gamification else 0,
-        "points": gamification.points if gamification else 0,
+        "streak": streak_val,
+        "points": points_val,
         "last_active_date": gamification.last_active_date if gamification else None
     }
 

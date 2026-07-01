@@ -90,9 +90,9 @@ export default function Dashboard() {
             availableCourses={availableCourses} 
             onEnrollSuccess={() => setRefreshTrigger(prev => prev + 1)} 
           />
-          <AIRecommendation />
+          {/* <AIRecommendation /> */}
           <RecentActivity />
-          <UpcomingTasks />
+          {/* <UpcomingTasks /> */}
         </div>
       </main>
     </div>

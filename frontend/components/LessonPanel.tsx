@@ -6,7 +6,7 @@ import "katex/dist/katex.min.css";
 import { BlockMath } from "react-katex";
 
 export interface BoardState {
-  type: "formula" | "image" | "widget" | null;
+  type: "formula" | "image" | "widget" | "code" | null; // ضفنا code هنا
   payload: any;
 }
 
@@ -48,6 +48,25 @@ export default function LessonPanel({ boardState, setWidgetMessage }: LessonPane
         {boardState?.type === "formula" && (
           <div className="max-w-full overflow-x-auto pb-4 text-2xl sm:text-3xl md:text-4xl text-blue-400 custom-scrollbar">
             <BlockMath math={boardState.payload} />
+          </div>
+        )}
+
+                {/* رسم الأكواد البرمجية */}
+        {boardState?.type === "code" && (
+          <div className="w-full max-w-3xl rounded-xl border border-zinc-700 bg-[#1e1e1e] overflow-hidden shadow-2xl text-left" dir="ltr">
+            <div className="flex items-center justify-between bg-zinc-800 px-4 py-3 border-b border-zinc-700">
+              <span className="text-xs font-mono text-zinc-400">Code Snippet</span>
+              <div className="flex gap-2">
+                <div className="h-3 w-3 rounded-full bg-red-500"></div>
+                <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
+                <div className="h-3 w-3 rounded-full bg-green-500"></div>
+              </div>
+            </div>
+            <div className="p-5 overflow-x-auto custom-scrollbar max-h-[500px]">
+              <pre className="text-sm text-green-400 font-mono text-left leading-relaxed">
+                <code>{boardState.payload}</code>
+              </pre>
+            </div>
           </div>
         )}
 

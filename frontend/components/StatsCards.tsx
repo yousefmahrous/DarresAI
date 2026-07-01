@@ -5,9 +5,10 @@ interface StatsCardsProps {
   coursesCount: number;
   aiScore: number;
   streak: number;
+  progress?: number; // ضفناها هنا عشان نقرأها، والـ Default هيكون 0
 }
 
-export default function StatsCards({ coursesCount, aiScore, streak }: StatsCardsProps) {
+export default function StatsCards({ coursesCount, aiScore, streak, progress = 0 }: StatsCardsProps) {
   return (
     <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
       <StatCard
@@ -17,11 +18,11 @@ export default function StatsCards({ coursesCount, aiScore, streak }: StatsCards
         icon={BookOpen}
       />
 
-      {/* نسبة التقدم هنعملها Mocking مؤقتاً للـ Demo عشان مش راجعة من مسار الـ Profile */}
+      {/* التعديل هنا: خلينا التقدم يقرأ من الداتا الحقيقية أو يبدأ من 0 */}
       <StatCard
         title="Overall Progress"
-        value="72%"
-        subtitle="+8% this week"
+        value={`${progress}%`}
+        subtitle={progress === 0 ? "Let's start learning!" : "+8% this week"}
         icon={TrendingUp}
       />
 

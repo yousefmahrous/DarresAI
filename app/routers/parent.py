@@ -38,9 +38,13 @@ def get_student_report(db: Session = Depends(get_db), current_user: User = Depen
     gamification = db.query(Gamification).filter(Gamification.student_id == student.id).first()
     lessons_count = db.query(LessonProgress).filter(LessonProgress.user_id == student.id).count()
 
+    # التعديل هنا: مطابقة الستريك والنقاط
+    streak_val = gamification.streak if gamification and gamification.streak > 0 else 1
+    points_val = gamification.points if gamification else 0
+
     return {
         "student_name": student.name,
-        "total_points": gamification.points if gamification else 0,
-        "current_streak": gamification.streak if gamification else 0,
+        "total_points": points_val,
+        "current_streak": streak_val,
         "completed_lessons_count": lessons_count
     }
