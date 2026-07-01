@@ -67,7 +67,8 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
     return new_user
 
-@router.post("/login", response_model=Token)
+# شيلنا response_model=Token عشان السيرفر يسمح بمرور بيانات اليوزر الجديدة
+@router.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.password_hash):
@@ -78,7 +79,18 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         )
     
     access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    
+    # التعديل هنا: بنرجع التوكين وجواه تفاصيل اليوزر (وأهمهم الـ role)
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "role": user.role
+        }
+    }
 
 @router.get("/me", response_model=UserResponse)
 def read_users_me(current_user: User = Depends(get_current_user)):

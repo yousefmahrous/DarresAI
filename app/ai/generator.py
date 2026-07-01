@@ -61,7 +61,7 @@ def generate_socratic_stream(query: str, context_str: str, chat_history: list):
     # 5. طلب الرد في شكل Stream
     print("[Engine] Generating Socratic Response with Tool Calling (Streaming)...")
     response = client.chat.completions.create(
-        model="gpt-4o-mini", 
+        model="gpt-4o", # 🚀 التعديل هنا: استخدمنا الموديل الأقوى والأذكى
         messages=messages,
         tools=tools,
         stream=True

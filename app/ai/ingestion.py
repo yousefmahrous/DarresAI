@@ -112,13 +112,13 @@ if __name__ == "__main__":
     #             print(f"🏷️ Tags -> Grade: {grade} | Subject: {subject} | Lang: {language}")
     #             print("-" * 50)
 
-    #             # مثال 1: كتاب فيزياء أولى ثانوي عربي
-    #             ingest_educational_material(
-    #                 file_path=file_path,
-    #                 grade=grade,
-    #                 subject=subject,
-    #                 language=language,
-    #             )
+                # مثال 1: كتاب فيزياء أولى ثانوي عربي
+                # ingest_educational_material(
+                #     file_path=file_path,
+                #     grade=grade,
+                #     subject=subject,
+                #     language=language,
+                # )
     
     # print("Ended Successfully")
     pass

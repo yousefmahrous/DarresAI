@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-import json # ضفنا المكتبة دي عشان نحول الداتا لـ JSON في الـ Stream
+import json
 
 from app.database import get_db
 from app.routers.auth import get_current_user
@@ -41,13 +41,10 @@ def create_course(course: CourseCreate, db: Session = Depends(get_db), current_u
 
 @router.get("/", response_model=List[CourseResponse])
 def get_my_courses(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    
     if current_user.role == "admin":
         return db.query(Course).all()
-    
     if current_user.role == "student":
         return db.query(Course).join(CourseEnrollment).filter(CourseEnrollment.student_id == current_user.id).all()
-    
     return []
 
 
@@ -146,40 +143,38 @@ def create_lesson(course_id: int, lesson: LessonCreate, db: Session = Depends(ge
     return new_lesson
 
 
-@router.get("/lessons/{lesson_id}/chat", response_model=List[ChatMessageResponse])
-def get_lesson_chat_history(lesson_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+# ==========================================
+# تعديلات الشات: تم توجيهها للكورس بدلاً من الدرس
+# ==========================================
+
+@router.get("/{course_id}/chat", response_model=List[ChatMessageResponse])
+def get_course_chat_history(course_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # بنستخدم عمود lesson_id مؤقتاً لتخزين رقم الكورس عشان نتجنب الـ Migrations
     messages = db.query(LessonChatMessage).filter(
         LessonChatMessage.user_id == current_user.id,
-        LessonChatMessage.lesson_id == lesson_id
+        LessonChatMessage.lesson_id == course_id 
     ).order_by(LessonChatMessage.created_at.asc()).all()
     return messages
 
-@router.post("/lessons/{lesson_id}/chat")
-def send_lesson_chat_message(
-    lesson_id: int, 
+
+@router.post("/{course_id}/chat")
+def send_course_chat_message(
+    course_id: int, 
     chat_input: ChatMessageCreate, 
     background_tasks: BackgroundTasks, 
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    # 1. تفعيل فحص الداتا بيز للدرس والكورس (الصح بقى)
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
-    if not lesson:
-        raise HTTPException(status_code=404, detail="الدرس غير موجود.")
-    
-    course = db.query(Course).filter(Course.id == lesson.course_id).first()
+    course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
-        raise HTTPException(status_code=404, detail="الكورس المرتبط بهذا الدرس غير موجود.")
+        raise HTTPException(status_code=404, detail="الكورس غير موجود.")
     
-    # ملحوظة: لو الـ Course Model لسه مفيهوش أعمدة subject و language، 
-    # استخدمنا getattr عشان نجيبهم ولو مش موجودين نحط قيم افتراضية عشان الكود ميضربش
     course_language = getattr(course, "language", "Arabic")
     course_title = course.title
     
-    # 2. تفعيل حفظ سؤال الطالب في الداتا بيز
     user_msg = LessonChatMessage(
         user_id=current_user.id, 
-        lesson_id=lesson_id, 
+        lesson_id=course_id, # حفظنا رقم الكورس هنا
         sender="user", 
         content=chat_input.content, 
         message_type="text"
@@ -187,13 +182,11 @@ def send_lesson_chat_message(
     db.add(user_msg)
     db.commit()
 
-    # 3. جلب تاريخ المحادثة الحقيقي من الداتا بيز
     chat_history = db.query(LessonChatMessage).filter(
         LessonChatMessage.user_id == current_user.id,
-        LessonChatMessage.lesson_id == lesson_id
+        LessonChatMessage.lesson_id == course_id
     ).order_by(LessonChatMessage.created_at.asc()).all()
 
-    # 4. دالة الـ Streaming اللي بتبعت JSON للسبورة والشات
     def ai_response_generator():
         stream = generate_ai_tutor_response(
             query=chat_input.content,
@@ -205,24 +198,20 @@ def send_lesson_chat_message(
         
         full_ai_response = ""
         for chunk in stream:
-            # بنجمع النص لو الحدث كان "message" عشان نحفظه في الداتا بيز
             if chunk.get("event") == "message" and chunk.get("data"):
                 full_ai_response += str(chunk["data"])
-                
-            # تحويل الـ Chunk لـ JSON String وبعته في الـ Stream
             yield f"data: {json.dumps(chunk)}\n\n"
             
         yield "data: [DONE]\n\n"
         
-        # 5. تفعيل حفظ رد الـ AI في الخلفية بعد ما الـ Stream يخلص
-        background_tasks.add_task(save_ai_message_to_db, current_user.id, lesson_id, full_ai_response, db)
+        background_tasks.add_task(save_ai_message_to_db, current_user.id, course_id, full_ai_response, db)
 
     return StreamingResponse(ai_response_generator(), media_type="text/event-stream")
 
-def save_ai_message_to_db(user_id: int, lesson_id: int, content: str, db: Session):
+def save_ai_message_to_db(user_id: int, course_id: int, content: str, db: Session):
     ai_msg = LessonChatMessage(
         user_id=user_id, 
-        lesson_id=lesson_id, 
+        lesson_id=course_id, 
         sender="ai", 
         content=content, 
         message_type="text"

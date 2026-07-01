@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link"; // ضفنا الـ Link هنا
 import { Brain, Sparkles, GraduationCap, TrendingUp, ArrowRight } from "lucide-react";
-import { useAuth } from "@/context/AuthContext"; // استدعاء الهوك بتاعنا
+import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
-  const { login } = useAuth(); // سحبنا دالة اللوجين من الـ Context
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -19,9 +20,8 @@ export default function LoginPage() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-            // الكود الجديد اللي بيبعت Form Data
       const formData = new URLSearchParams();
-      formData.append("username", email); // الباك إند بيقراها username
+      formData.append("username", email); 
       formData.append("password", password);
 
       const response = await fetch(`${apiUrl}/api/auth/login`, {
@@ -35,13 +35,22 @@ export default function LoginPage() {
       }
 
       const data = await response.json();
-      
-      // 2. الفرضية هنا إن الباك إند بيرجع التوكين وبيانات اليوزر
-      // لو الباك إند بيرجع توكين بس، هنحتاج نعمل fetch تاني لـ /api/users/me
       const token = data.access_token;
-      const userData = data.user || { id: 1, email: email, school_year: "prep_3" }; // داتا مؤقتة لو الباك إند مبعتهاش
       
-      // 3. بنبعتهم للـ Context وهو هيتصرف
+      const userData = data.user ? {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.name,
+        role: data.user.role, 
+      } : { 
+        id: 1, 
+        email: email, 
+        school_year: "prep_3",
+        role: "student" 
+      };
+      
+      localStorage.setItem("access_token", token);
+      
       login(token, userData);
       
     } catch (err: any) {
@@ -116,7 +125,16 @@ export default function LoginPage() {
               {!isLoading && <ArrowRight size={18} />}
             </button>
           </form>
-          <p className="mt-8 text-center text-sm text-zinc-500">Secure authentication powered by DARES-AI</p>
+
+          {/* اللينك بتاع الـ Sign up انضاف هنا */}
+          <p className="mt-6 text-center text-sm text-zinc-400">
+            Don't have an account?{" "}
+            <Link href="/signup" className="font-semibold text-blue-500 transition-colors hover:text-blue-400">
+              Sign up
+            </Link>
+          </p>
+
+          <p className="mt-6 text-center text-sm text-zinc-500">Secure authentication powered by DARES-AI</p>
         </div>
       </div>
     </main>

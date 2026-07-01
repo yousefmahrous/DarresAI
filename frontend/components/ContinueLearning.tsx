@@ -1,147 +1,110 @@
-import Link from "next/link";
-import {
-  BookOpen,
-  Clock3,
-  BarChart3,
-  ArrowRight,
-} from "lucide-react";
+"use client";
 
-export default function ContinueLearning() {
+import { useState } from "react";
+import { BookOpen, PlusCircle, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+
+// تعريف شكل بيانات الكورس اللي جاية من الـ API
+interface Course {
+  id: number;
+  title: string;
+  description: string;
+  school_year: string;
+  language: string;
+}
+
+interface Props {
+  availableCourses: Course[];
+  onEnrollSuccess: () => void;
+}
+
+export default function ContinueLearning({ availableCourses, onEnrollSuccess }: Props) {
+  const [enrollingId, setEnrollingId] = useState<number | null>(null);
+  const router = useRouter();
+
+  const handleEnroll = async (courseId: number) => {
+    setEnrollingId(courseId);
+    try {
+      const token = localStorage.getItem("access_token");
+      const res = await fetch(`http://localhost:8000/api/courses/${courseId}/enroll`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+
+      if (res.ok) {
+        // لو الاشتراك نجح، نحدث الداشبورد
+        onEnrollSuccess();
+      } else {
+        const err = await res.json();
+        alert(err.detail || "حدث خطأ أثناء الاشتراك");
+      }
+    } catch (error) {
+      console.error("Enrollment failed", error);
+    } finally {
+      setEnrollingId(null);
+    }
+  };
+
   return (
-    <div
-      className="
-        group
-        rounded-3xl
-        border border-zinc-800
-        bg-zinc-900
-        p-8
-        shadow-lg
-        transition-all
-        duration-300
-        hover:-translate-y-1
-        hover:border-blue-500/40
-      "
-    >
+    <div className="group rounded-3xl border border-zinc-800 bg-zinc-900 p-8 shadow-lg transition-all duration-300 hover:border-blue-500/40 flex flex-col h-[400px]">
+      
       {/* Header */}
-      <div className="flex items-start justify-between">
-
+      <div className="flex items-start justify-between mb-6">
         <div>
-
-          <p className="text-sm font-medium text-blue-500">
-            Continue Learning
+          <p className="flex items-center gap-2 text-sm font-medium text-blue-500">
+            <Sparkles size={16} /> Discover
           </p>
-
-          <h2 className="mt-2 text-3xl font-bold text-white">
-            Physics
-          </h2>
-
+          <h2 className="mt-2 text-3xl font-bold text-white">Available Courses</h2>
         </div>
-
-        <span className="rounded-full bg-blue-600/15 px-3 py-1 text-xs font-medium text-blue-400">
-          Intermediate
+        <span className="rounded-full bg-blue-600/15 px-4 py-2 text-xs font-medium text-blue-400">
+          {availableCourses.length} Courses
         </span>
-
       </div>
 
-      {/* Lesson */}
-
-      <div className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
-
-        <div className="flex items-center gap-3">
-
-          <div className="rounded-xl bg-blue-600/15 p-3">
-            <BookOpen className="text-blue-500" size={22} />
+      {/* Courses List */}
+      <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+        {availableCourses.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-950 p-5 text-center text-zinc-400">
+            <CheckCircle2 className="mb-3 text-green-500" size={40} />
+            <p className="font-medium text-white">You're all caught up!</p>
+            <p className="mt-1 text-sm">You are enrolled in all available courses for your grade.</p>
           </div>
-
-          <div>
-
-            <p className="font-semibold text-white">
-              Newton's Second Law
-            </p>
-
-            <p className="text-sm text-zinc-400">
-              Lesson 8 of 12
-            </p>
-
-          </div>
-
-        </div>
-
+        ) : (
+          availableCourses.map((course) => (
+            <div 
+              key={course.id} 
+              className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5 flex items-center justify-between transition duration-300 hover:border-zinc-600"
+            >
+              <div className="flex items-center gap-4">
+                <div className="rounded-xl bg-blue-600/15 p-3 hidden sm:block">
+                  <BookOpen className="text-blue-500" size={24} />
+                </div>
+                <div>
+                  <p className="font-bold text-white text-lg">{course.title}</p>
+                  <p className="text-sm text-zinc-400 line-clamp-1">
+                    {course.description || "Start learning this subject today!"}
+                  </p>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => handleEnroll(course.id)}
+                disabled={enrollingId === course.id}
+                className="flex shrink-0 items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {enrollingId === course.id ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <PlusCircle size={16} />
+                )}
+                Enroll
+              </button>
+            </div>
+          ))
+        )}
       </div>
-
-      {/* Stats */}
-
-      <div className="mt-6 flex items-center justify-between text-sm text-zinc-400">
-
-        <div className="flex items-center gap-2">
-
-          <Clock3 size={16} />
-
-          <span>12 min remaining</span>
-
-        </div>
-
-        <div className="flex items-center gap-2">
-
-          <BarChart3 size={16} />
-
-          <span>72% Completed</span>
-
-        </div>
-
-      </div>
-
-      {/* Progress */}
-
-      <div className="mt-5">
-
-        <div className="h-3 overflow-hidden rounded-full bg-zinc-800">
-
-          <div className="h-full w-[72%] rounded-full bg-blue-600 transition-all duration-500"></div>
-
-        </div>
-
-      </div>
-
-      {/* Footer */}
-
-      <div className="mt-8 flex items-center justify-between">
-
-        <div>
-
-          <p className="text-lg font-semibold text-white">
-            Keep Going 🚀
-          </p>
-
-          <p className="text-sm text-zinc-400">
-            Only 4 lessons left in this chapter.
-          </p>
-
-        </div>
-
-        <Link
-          href="/chat"
-          className="
-            flex items-center gap-2
-            rounded-xl
-            bg-blue-600
-            px-6
-            py-3
-            font-semibold
-            text-white
-            transition-all
-            duration-300
-            hover:bg-blue-700
-            hover:shadow-lg
-          "
-        >
-          Continue
-
-          <ArrowRight size={18} />
-        </Link>
-
-      </div>
-
     </div>
   );
 }

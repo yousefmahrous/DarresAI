@@ -1,13 +1,15 @@
 "use client";
+
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css"; // ضروري عشان الستايل بتاع المعادلات
+import "katex/dist/katex.min.css"; 
 
 import { useState, useEffect } from "react";
 import { Bot, User, Sparkles } from "lucide-react";
 import ChatInput from "./ChatInput";
 import { BoardState } from "./LessonPanel";
+import { useSearchParams } from "next/navigation"; // عشان نقرأ رقم الكورس من اللينك
 
 interface Message {
   role: "user" | "ai";
@@ -21,6 +23,9 @@ interface ChatPanelProps {
 }
 
 export default function ChatPanel({ setBoardState, widgetMessage, setWidgetMessage }: ChatPanelProps) {
+  const searchParams = useSearchParams();
+  const courseId = searchParams.get("courseId") || "1"; // بنلقط رقم الكورس هنا
+
   const [messages, setMessages] = useState<Message[]>([
     { role: "ai", content: "أهلاً بيك! أنا المدرس الذكي بتاعك، تحب تسأل في إيه النهارده؟ 👋" }
   ]);
@@ -40,10 +45,10 @@ export default function ChatPanel({ setBoardState, widgetMessage, setWidgetMessa
       setMessages((prev) => [...prev, { role: "ai", content: "" }]);
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const lessonId = 1; 
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem("access_token") || localStorage.getItem("token");
 
-      const response = await fetch(`${apiUrl}/api/courses/lessons/${lessonId}/chat`, {
+      // بنبعت الشات لـ API الكورس بدلاً من الدرس
+      const response = await fetch(`${apiUrl}/api/courses/${courseId}/chat`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -57,6 +62,7 @@ export default function ChatPanel({ setBoardState, widgetMessage, setWidgetMessa
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
+      let accumulatedResponse = "";
 
       while (true) {
         const { value, done } = await reader.read();
@@ -71,6 +77,14 @@ export default function ChatPanel({ setBoardState, widgetMessage, setWidgetMessa
 
             if (text === "[DONE]") {
               setIsLoading(false);
+              // اللقطة هنا: لما الستريم يخلص، بنفحص هل الـ AI بعت كود النقاط؟
+              if (accumulatedResponse.includes("[ADD_POINTS: 5]")) {
+                 fetch(`${apiUrl}/api/gamification/add-points`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                    body: JSON.stringify({ points: 5 })
+                 }).catch(err => console.error("Error adding points:", err));
+              }
               continue;
             }
 
@@ -78,6 +92,7 @@ export default function ChatPanel({ setBoardState, widgetMessage, setWidgetMessa
               const parsedData = JSON.parse(text);
 
               if (parsedData.event === "message" && parsedData.data) {
+                accumulatedResponse += parsedData.data;
                 setMessages((prev) => {
                   const newMessages = [...prev];
                   const lastIndex = newMessages.length - 1;
@@ -113,7 +128,6 @@ export default function ChatPanel({ setBoardState, widgetMessage, setWidgetMessa
   }, [widgetMessage]);
 
   return (
-    // التعديل هنا: ضفنا max-h-[800px] و overflow-hidden عشان نقفل حجم الشات
     <div className="flex flex-1 flex-col rounded-3xl border border-zinc-800 bg-zinc-900 p-8 shadow-lg h-[800px] max-h-[800px] overflow-hidden">
       <div className="flex items-center justify-between border-b border-zinc-800 pb-6 shrink-0">
         <div className="flex items-center gap-4">
@@ -131,7 +145,6 @@ export default function ChatPanel({ setBoardState, widgetMessage, setWidgetMessa
         </div>
       </div>
 
-      {/* التعديل هنا: ضفنا flex-1 و overflow-y-auto عشان السكرول يشتغل هنا بس */}
       <div className="mt-8 flex-1 space-y-8 overflow-y-auto pr-2 scroll-smooth">
         {messages.map((msg, index) => (
           <div key={index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -153,7 +166,8 @@ export default function ChatPanel({ setBoardState, widgetMessage, setWidgetMessa
                     remarkPlugins={[remarkMath]}
                     rehypePlugins={[rehypeKatex]}
                   >
-                    {msg.content}
+                    {/* التعديل هنا: استبدال الكود السري وإخفاؤه جوه الـ map */}
+                    {msg.content.replace(/\[ADD_POINTS:\s*5\]/g, "")}
                   </ReactMarkdown>
                 </div>
               </div>

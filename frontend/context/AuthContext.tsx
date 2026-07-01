@@ -9,6 +9,7 @@ interface User {
   email: string;
   name?: string;
   school_year?: string;
+  role?: string;
 }
 
 // 2. تعريف الدوال والبيانات اللي أي صفحة تقدر تشوفها
@@ -38,13 +39,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // دالة اللوجين (بتحفظ التوكين واليوزر في الستيت والمتصفح)
   const login = (newToken: string, userData: User) => {
     setToken(newToken);
     setUser(userData);
     localStorage.setItem("token", newToken);
     localStorage.setItem("user", JSON.stringify(userData));
-    router.push("/dashboard");
+    
+    // التوجيه الذكي بناءً على الـ Role
+    if (userData.role === "parent") {
+      router.push("/progress");
+    } else {
+      router.push("/dashboard");
+    }
   };
 
   // دالة الخروج (بتمسح كل حاجة)

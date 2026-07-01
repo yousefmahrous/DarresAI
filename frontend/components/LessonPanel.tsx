@@ -46,7 +46,7 @@ export default function LessonPanel({ boardState, setWidgetMessage }: LessonPane
         )}
 
         {boardState?.type === "formula" && (
-          <div className="text-4xl text-blue-400">
+          <div className="max-w-full overflow-x-auto pb-4 text-2xl sm:text-3xl md:text-4xl text-blue-400 custom-scrollbar">
             <BlockMath math={boardState.payload} />
           </div>
         )}

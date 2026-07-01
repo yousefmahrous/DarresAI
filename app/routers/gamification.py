@@ -8,6 +8,7 @@ from app.models.gamification import Gamification
 from app.routers.auth import get_current_user
 from app.models.users import User
 from app.services.streak_manager import calculate_and_update_streak
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -41,3 +42,21 @@ def check_and_update_streak(db: Session = Depends(get_db), current_user: User = 
         
     result = calculate_and_update_streak(db=db, student_id=current_user.id)
     return result
+
+class PointsAdd(BaseModel):
+    points: int
+
+@router.post("/add-points")
+def add_points_to_student(data: PointsAdd, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="هذه الصلاحية للطلاب فقط.")
+        
+    gamification = db.query(Gamification).filter(Gamification.student_id == current_user.id).first()
+    if not gamification:
+        # لو ملوش سجل، نكريتله واحد
+        gamification = Gamification(student_id=current_user.id, points=0)
+        db.add(gamification)
+        
+    gamification.points += data.points
+    db.commit()
+    return {"message": "تمت إضافة النقاط بنجاح!", "total_points": gamification.points}
